@@ -1,1 +1,146 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>ASN Quiz Player</title>
+  <link rel="stylesheet" href="./style.css"/>
+</head>
+<body>
+<div class="wrap" style="max-width:560px;margin:0 auto;">
+  <div class="card" id="joinCard">
+    <div class="big">Katıl</div>
+    <div class="small kv" id="gidLbl">-</div>
+    <input id="name" placeholder="İsmin"/>
+    <button class="primary" id="btnJoin" style="width:100%;margin-top:10px;">Join</button>
+    <div class="small" style="margin-top:10px;">Not: Join olduktan sonra host başlatınca soru gelir.</div>
+  </div>
+
+  <div class="card" id="qCard" style="display:none;">
+    <div class="row">
+      <div class="big" id="qIndex">Soru</div>
+      <div class="small">Puan: <b class="kv" id="score">-</b></div>
+    </div>
+
+    <div class="progress" style="margin-top:10px">
+      <div class="fill" id="fill"></div>
+      <div class="label" id="t">10.0s</div>
+    </div>
+
+    <div class="big" style="margin-top:12px" id="qText">-</div>
+
+    <div class="answers" style="margin-top:12px">
+      <button class="ans" id="c0">-</button>
+      <button class="ans" id="c1">-</button>
+      <button class="ans" id="c2">-</button>
+      <button class="ans" id="c3">-</button>
+    </div>
+
+    <div class="small" id="msg" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card" id="waitCard" style="display:none;">
+    <div class="big">Beklemede…</div>
+    <div class="small">Host başlatınca soru gelir / Leaderboard arasında bekler.</div>
+  </div>
+</div>
+
+<script>
+  // ✅ BURAYI DOĞRU WORKER URL İLE AYARLA
+  const API_BASE = "https://asn-quiz.abdulkadir-sezginn.workers.dev";
+
+  const $ = id => document.getElementById(id);
+  const u = new URL(location.href);
+  const gameId = (u.searchParams.get("game") || "").toUpperCase();
+
+  $("gidLbl").textContent = "Oyun: " + (gameId || "-");
+
+  let playerId = localStorage.getItem("p_id_"+gameId) || "";
+  let playerToken = localStorage.getItem("p_tok_"+gameId) || "";
+  let lastAnsweredQ = Number(localStorage.getItem("p_lastq_"+gameId) || "-1");
+
+  async function api(path, method="GET", body=null){
+    const r = await fetch(API_BASE + path, {
+      method,
+      headers: {"Content-Type":"application/json"},
+      body: body ? JSON.stringify(body) : null
+    });
+    if(!r.ok) throw new Error(await r.text());
+    return r.json();
+  }
+
+  function show(which){
+    $("joinCard").style.display = which==="join" ? "" : "none";
+    $("qCard").style.display = which==="q" ? "" : "none";
+    $("waitCard").style.display = which==="wait" ? "" : "none";
+  }
+
+  $("btnJoin").onclick = async ()=>{
+    const name = $("name").value.trim();
+    if(!gameId) return alert("Link hatalı. ?game=XXXX parametresi yok.");
+    if(!name) return alert("İsim gir");
+    const res = await api(`/api/game/${gameId}/join`, "POST", { name });
+    playerId = res.playerId;
+    playerToken = res.playerToken;
+    localStorage.setItem("p_id_"+gameId, playerId);
+    localStorage.setItem("p_tok_"+gameId, playerToken);
+    show("wait");
+  };
+
+  async function send(choice){
+    $("msg").textContent = "Gönderiliyor…";
+    try{
+      await api(`/api/game/${gameId}/answer`, "POST", { playerId, playerToken, choice });
+      $("msg").textContent = "Gönderildi ✅";
+      lastAnsweredQ = currentQIndex;
+      localStorage.setItem("p_lastq_"+gameId, String(lastAnsweredQ));
+    }catch(e){
+      $("msg").textContent = "Alınmadı (süre bitmiş olabilir).";
+    }
+    ["c0","c1","c2","c3"].forEach(id => $(id).disabled = true);
+  }
+
+  ["c0","c1","c2","c3"].forEach((id,i)=> $(id).onclick = ()=>send(i));
+
+  let currentQIndex = -1;
+
+  async function poll(){
+    if(!gameId){ show("join"); return; }
+    if(!playerId){ show("join"); return; }
+
+    const st = await api(`/api/game/${gameId}/state`);
+
+    // Score'u host state içinden direkt veremiyoruz (bilerek).
+    // Basit olsun diye burada göstermiyoruz; istersen API'ye oyuncu skor endpointi ekleriz.
+    $("score").textContent = "—";
+
+    if(st.phase === "lobby"){ show("wait"); return; }
+
+    if(st.phase === "question"){
+      show("q");
+
+      currentQIndex = st.qIndex ?? -1;
+      $("qIndex").textContent = `Soru ${currentQIndex + 1}/${st.qTotal ?? 0}`;
+      $("qText").textContent = st.q?.text || "-";
+      (st.q?.choices || ["-","-","-","-"]).forEach((x,i)=> $("c"+i).textContent = x);
+
+      const endsAt = st.endsAt || (Date.now()+10000);
+      const left = Math.max(0, endsAt - Date.now());
+      $("t").textContent = (left/1000).toFixed(1)+"s";
+      $("fill").style.width = (left/10000*100).toFixed(0)+"%";
+
+      const answeredThis = (lastAnsweredQ === currentQIndex);
+      ["c0","c1","c2","c3"].forEach(id => $(id).disabled = answeredThis);
+      if(!answeredThis) $("msg").textContent = "";
+      return;
+    }
+
+    // leaderboard/finished vs
+    show("wait");
+  }
+
+  setInterval(()=>poll().catch(()=>{}), 300);
+</script>
+</body>
+</html>
 
