@@ -1,1 +1,19 @@
+name = "asn-quiz"
+main = "worker/src/index.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+APP_ORIGIN = "https://asn-quiz.pages.dev"  # Pages URL'n buysa, değilse sonra düzelt
+
+[[kv_namespaces]]
+binding = "QUIZ_KV"
+id = "2ecc367e4299466dbf82b9a8b4629bd3"
+
+[[durable_objects.bindings]]
+name = "GAME"
+class_name = "GameRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GameRoom"]
 
