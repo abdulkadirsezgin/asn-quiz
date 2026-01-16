@@ -3,7 +3,7 @@ main = "src/index.js"
 compatibility_date = "2025-01-01"
 
 [vars]
-APP_ORIGIN = "https://abdulkadirsezgin.github.io/asn-quiz"
+APP_ORIGIN = "https://asn-quiz.pages.dev"
 
 [[kv_namespaces]]
 binding = "QUIZ_KV"
