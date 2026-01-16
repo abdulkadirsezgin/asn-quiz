@@ -95,14 +95,23 @@
     return r.json();
   }
 
-  $("btnCreate").onclick = async ()=>{
+$("btnCreate").onclick = async ()=>{
+  $("err").textContent = "Create istek atılıyor...";
+  try {
     const res = await api("/api/game/create","POST",{quizKey:"quiz:siber"});
     gameId = res.gameId;
     hostToken = res.hostToken;
     localStorage.setItem("asn_gameId", gameId);
     localStorage.setItem("asn_hostToken", hostToken);
+    $("err").textContent = "OK ✅ GameID: " + gameId;
     alert("Game created: " + gameId);
-  };
+  } catch (e) {
+    $("err").textContent = "HATA ❌ " + (e?.message || e);
+    console.error(e);
+    alert("Create Game hata: " + (e?.message || e));
+  }
+};
+
 
   $("btnStart").onclick = async ()=>{
     if(!gameId) return alert("Önce Create Game");
