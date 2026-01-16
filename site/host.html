@@ -1,1 +1,159 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>ASN Quiz Host</title>
+  <link rel="stylesheet" href="./style.css"/>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="row">
+      <div class="big">ASN Quiz (Host)</div>
+      <div class="small kv" id="apiLbl"></div>
+    </div>
+
+    <div class="row" style="margin-top:12px;">
+      <button class="primary" id="btnCreate">Create Game</button>
+      <button id="btnStart">Start</button>
+      <button id="btnNext">Next</button>
+      <button id="btnClear">Clear Local</button>
+    </div>
+
+    <hr/>
+
+    <div class="row">
+      <div class="small">GameId: <b class="kv" id="gameId">-</b></div>
+      <div class="small">Katılan: <b id="pc">0</b></div>
+      <div class="small">Phase: <b class="kv" id="phase">-</b></div>
+    </div>
+
+    <div style="margin-top:10px" class="small">
+      Join link:
+      <div class="kv" id="joinLink" style="margin-top:6px; word-break: break-all;">-</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div class="big" id="qIndex">Soru</div>
+      <div class="small">Toplam: <b id="qTotal">-</b></div>
+    </div>
+
+    <div style="margin-top:10px" class="progress">
+      <div class="fill" id="fill"></div>
+      <div class="label" id="t">10.0s</div>
+    </div>
+
+    <div style="margin-top:14px" class="big" id="qText">-</div>
+
+    <div class="answers" style="margin-top:14px">
+      <div class="ans" id="a0">-</div>
+      <div class="ans" id="a1">-</div>
+      <div class="ans" id="a2">-</div>
+      <div class="ans" id="a3">-</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="big">Top 4</div>
+    <div id="top" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<script>
+  // ✅ BURAYI DOĞRU WORKER URL İLE AYARLA
+  const API_BASE = "https://asn-quiz.abdulkadir-sezginn.workers.dev";
+
+  const $ = (id) => document.getElementById(id);
+  $("apiLbl").textContent = API_BASE;
+
+  let gameId = localStorage.getItem("asn_gameId") || "";
+  let hostToken = localStorage.getItem("asn_hostToken") || "";
+
+  function joinUrl(gid){
+    const base = location.origin + location.pathname.replace(/host\.html$/,"play.html");
+    return `${base}?game=${encodeURIComponent(gid)}`;
+  }
+
+  async function api(path, method="GET", body=null, auth=false){
+    const headers = {"Content-Type":"application/json"};
+    if(auth && hostToken) headers["Authorization"] = "Bearer " + hostToken;
+
+    const r = await fetch(API_BASE + path, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : null
+    });
+
+    if(!r.ok) throw new Error(await r.text());
+    return r.json();
+  }
+
+  $("btnCreate").onclick = async ()=>{
+    const res = await api("/api/game/create","POST",{quizKey:"quiz:siber"});
+    gameId = res.gameId;
+    hostToken = res.hostToken;
+    localStorage.setItem("asn_gameId", gameId);
+    localStorage.setItem("asn_hostToken", hostToken);
+    alert("Game created: " + gameId);
+  };
+
+  $("btnStart").onclick = async ()=>{
+    if(!gameId) return alert("Önce Create Game");
+    await api(`/api/game/${gameId}/start`,"POST",{},true);
+  };
+
+  $("btnNext").onclick = async ()=>{
+    if(!gameId) return alert("Önce Create Game");
+    await api(`/api/game/${gameId}/next`,"POST",{},true);
+  };
+
+  $("btnClear").onclick = ()=>{
+    localStorage.removeItem("asn_gameId");
+    localStorage.removeItem("asn_hostToken");
+    gameId = "";
+    hostToken = "";
+    alert("Local temizlendi");
+  };
+
+  async function poll(){
+    if(!gameId){
+      $("gameId").textContent = "-";
+      $("joinLink").textContent = "-";
+      $("phase").textContent = "-";
+      return;
+    }
+
+    const st = await api(`/api/game/${gameId}/state`);
+    $("gameId").textContent = gameId;
+    $("pc").textContent = st.playerCount || 0;
+    $("phase").textContent = st.phase || "-";
+    $("joinLink").textContent = joinUrl(gameId);
+
+    $("qTotal").textContent = st.qTotal ?? "-";
+    $("qIndex").textContent = `Soru ${(st.qIndex ?? -1) + 1}`;
+    $("qText").textContent = st.q?.text || "-";
+
+    const choices = st.q?.choices || ["-","-","-","-"];
+    choices.forEach((x,i)=> $("a"+i).textContent = x);
+
+    // timer bar
+    const endsAt = st.endsAt || (Date.now()+10000);
+    const left = Math.max(0, endsAt - Date.now());
+    $("t").textContent = (left/1000).toFixed(1) + "s";
+    $("fill").style.width = (left/10000*100).toFixed(0) + "%";
+
+    // top4
+    const top = st.top4 || [];
+    $("top").innerHTML = top.length
+      ? top.map((p,i)=>`<div class="row"><div>${i+1}. ${p.name}</div><div class="kv">${p.score}</div></div>`).join("")
+      : "<div class='small'>-</div>";
+  }
+
+  setInterval(()=>poll().catch(()=>{}), 300);
+</script>
+</body>
+</html>
 
