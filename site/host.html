@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>ASN Quiz Host</title>
   <link rel="stylesheet" href="./style.css"/>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -31,6 +32,7 @@
 
     <div style="margin-top:10px" class="small">
       Join link:
+      <div id="qr" style="margin-top:10px;"></div>
       <div class="kv" id="joinLink" style="margin-top:6px; word-break: break-all;">-</div>
     </div>
     <div class="small" style="margin-top:10px;">
@@ -77,10 +79,9 @@
   let hostToken = localStorage.getItem("asn_hostToken") || "";
 
   function joinUrl(gid){
-    const base = location.origin + location.pathname.replace(/host\.html$/,"play.html");
-    return `${base}?game=${encodeURIComponent(gid)}`;
-  }
-
+  return `${location.origin}/play.html?game=${encodeURIComponent(gid)}`;
+}
+  
   async function api(path, method="GET", body=null, auth=false){
     const headers = {"Content-Type":"application/json"};
     if(auth && hostToken) headers["Authorization"] = "Bearer " + hostToken;
@@ -143,7 +144,13 @@ $("btnCreate").onclick = async ()=>{
     $("gameId").textContent = gameId;
     $("pc").textContent = st.playerCount || 0;
     $("phase").textContent = st.phase || "-";
-    $("joinLink").textContent = joinUrl(gameId);
+    const link = joinUrl(gameId);
+$("joinLink").textContent = link;
+
+// QR
+const qrEl = document.getElementById("qr");
+qrEl.innerHTML = "";
+new QRCode(qrEl, { text: link, width: 200, height: 200 });
 
     $("qTotal").textContent = st.qTotal ?? "-";
     $("qIndex").textContent = `Soru ${(st.qIndex ?? -1) + 1}`;
