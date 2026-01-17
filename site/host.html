@@ -78,8 +78,8 @@
   let gameId = localStorage.getItem("asn_gameId") || "";
   let hostToken = localStorage.getItem("asn_hostToken") || "";
 
-  function joinUrl(gid){
-  return `${location.origin}/play.html?game=${encodeURIComponent(gid)}`;
+function joinUrl(gid){
+  return `https://asn-quiz.pages.dev/play.html?game=${encodeURIComponent(gid)}`;
 }
   
   async function api(path, method="GET", body=null, auth=false){
