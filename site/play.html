@@ -64,6 +64,10 @@
   let lastAnsweredQ = Number(localStorage.getItem("p_lastq_"+gameId) || "-1");
   let answeredThisQuestion = false;
   let currentQIndex = -1;
+  let serverEndsAt = null;     // st.endsAt
+let lastLeftMs = 10_000;     // animasyonda göstereceğimiz kalan süre
+let rafId = null;
+
 
   async function api(path, method="GET", body=null){
     const r = await fetch(API_BASE + path, {
@@ -80,6 +84,31 @@
     $("qCard").style.display = which==="q" ? "" : "none";
     $("waitCard").style.display = which==="wait" ? "" : "none";
   }
+function startSmoothTimer() {
+  if (rafId) return;
+
+  let lastNow = performance.now();
+  const tick = (now) => {
+    const dt = Math.min(100, now - lastNow); // büyük sıçramaları yumuşat
+    lastNow = now;
+
+    // kalan süreyi akıcı düşür
+    lastLeftMs = Math.max(0, lastLeftMs - dt);
+
+    // UI güncelle
+    $("t").textContent = (lastLeftMs / 1000).toFixed(1);
+    $("fill").style.width = (lastLeftMs / 10_000 * 100).toFixed(0) + "%";
+
+    rafId = requestAnimationFrame(tick);
+  };
+
+  rafId = requestAnimationFrame(tick);
+}
+
+function stopSmoothTimer() {
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = null;
+}
 
   $("btnJoin").onclick = async ()=>{
     const name = $("name").value.trim();
@@ -123,18 +152,21 @@
       : "<div class='small'>-</div>";
 
     if(st.phase === "lobby"){
+        stopSmoothTimer();
       show("wait");
       $("waitMsg").textContent = "Host başlatınca soru gelir.";
       return;
     }
 
     if(st.phase === "leaderboard"){
+        stopSmoothTimer();
       show("wait");
       $("waitMsg").textContent = "Skorlar güncellendi. Host Next ile devam edecek.";
       return;
     }
 
     if(st.phase === "finished"){
+      stopSmoothTimer();
       show("wait");
       $("waitMsg").textContent = "Quiz bitti 🎉";
       return;
@@ -154,10 +186,22 @@
       $("qText").textContent = st.q?.text || "-";
       (st.q?.choices || ["-","-","-","-"]).forEach((x,i)=> $("ct"+i).textContent = x);
 
-      const endsAt = (typeof st.endsAt === "number") ? st.endsAt : (Date.now()+10000);
-      const left = Math.max(0, endsAt - Date.now());
-      $("t").textContent = (left/1000).toFixed(1);
-      $("fill").style.width = (left/10000*100).toFixed(0) + "%";
+      const endsAt = (typeof st.endsAt === "number") ? st.endsAt : (Date.now() + 10_000);
+
+// serverEndsAt değiştiyse ya da ilk kez geldiyse, animasyonu server’a hizala
+if (serverEndsAt !== endsAt) {
+  serverEndsAt = endsAt;
+  lastLeftMs = Math.max(0, serverEndsAt - Date.now());
+}
+
+// Eğer animasyon drift yaptıysa (ör: dondu), tekrar hizala
+const computedLeft = Math.max(0, serverEndsAt - Date.now());
+if (Math.abs(computedLeft - lastLeftMs) > 350) {
+  lastLeftMs = computedLeft;
+}
+
+startSmoothTimer();
+
 
       const answered = answeredThisQuestion || (lastAnsweredQ === currentQIndex);
       ["c0","c1","c2","c3"].forEach(id => $(id).disabled = answered);
@@ -165,6 +209,7 @@
       if(!answered) $("msg").textContent = "";
       return;
     }
+stopSmoothTimer();
 
     show("wait");
   }
