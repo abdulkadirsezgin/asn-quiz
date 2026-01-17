@@ -93,17 +93,24 @@ let answeredThisQuestion = false;
   };
 
   async function send(choice){
-    $("msg").textContent = "Gönderiliyor…";
-    try{
-      await api(`/api/game/${gameId}/answer`, "POST", { playerId, playerToken, choice });
-      $("msg").textContent = "Gönderildi ✅";
-      lastAnsweredQ = currentQIndex;
-      localStorage.setItem("p_lastq_"+gameId, String(lastAnsweredQ));
-    }catch(e){
-      $("msg").textContent = "Alınmadı (süre bitmiş olabilir).";
-    }
-    ["c0","c1","c2","c3"].forEach(id => $(id).disabled = true);
+  // anında kilitle (PC’de çift tıklama / tekrar gönderme engeli)
+  answeredThisQuestion = true;
+  ["c0","c1","c2","c3"].forEach(id => $(id).disabled = true);
+
+  $("msg").textContent = "Gönderiliyor…";
+  try{
+    await api(`/api/game/${gameId}/answer`, "POST", { playerId, playerToken, choice });
+    $("msg").textContent = "Gönderildi ✅";
+
+    // ✅ EN KRİTİK: currentQIndex doğruyken yaz
+    lastAnsweredQ = currentQIndex;
+    localStorage.setItem("p_lastq_"+gameId, String(lastAnsweredQ));
+  }catch(e){
+    $("msg").textContent = "Alınmadı (süre bitmiş olabilir).";
+    // hata olsa bile bu soruda tekrar denemesin istersen true kalsın
   }
+}
+
 
   ["c0","c1","c2","c3"].forEach((id,i)=> $(id).onclick = ()=>send(i));
 
