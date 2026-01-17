@@ -124,7 +124,7 @@
       $("qText").textContent = st.q?.text || "-";
       (st.q?.choices || ["-","-","-","-"]).forEach((x,i)=> $("c"+i).textContent = x);
 
-      const endsAt = st.endsAt || (Date.now()+10000);
+     const endsAt = (typeof st.endsAt === "number" ? st.endsAt : Date.now() + 10000);
       const left = Math.max(0, endsAt - Date.now());
       $("t").textContent = (left/1000).toFixed(1)+"s";
       $("fill").style.width = (left/10000*100).toFixed(0)+"%";
