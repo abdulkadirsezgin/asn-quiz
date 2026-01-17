@@ -7,33 +7,35 @@
   <link rel="stylesheet" href="./style.css"/>
 </head>
 <body>
-<div class="wrap" style="max-width:560px;margin:0 auto;">
+<div class="wrap" style="max-width:720px">
+
   <div class="card" id="joinCard">
     <div class="big">Katıl</div>
     <div class="small kv" id="gidLbl">-</div>
-    <input id="name" placeholder="İsmin"/>
-    <button class="primary" id="btnJoin" style="width:100%;margin-top:10px;">Join</button>
-    <div class="small" style="margin-top:10px;">Not: Join olduktan sonra host başlatınca soru gelir.</div>
+    <div style="margin-top:10px">
+      <input id="name" placeholder="İsmin"/>
+      <button class="primary" id="btnJoin" style="width:100%;margin-top:10px;">Join</button>
+    </div>
+    <div class="small" style="margin-top:10px;">Host başlatınca soru gelir.</div>
   </div>
 
   <div class="card" id="qCard" style="display:none;">
     <div class="row">
-      <div class="big" id="qIndex">Soru</div>
-      <div class="small">Puan: <b class="kv" id="score">-</b></div>
+      <div class="pill huge" id="t">10.0</div>
+      <div class="pill small" id="qIndex">Soru</div>
     </div>
 
-    <div class="progress" style="margin-top:10px">
+    <div style="margin-top:12px" class="progress">
       <div class="fill" id="fill"></div>
-      <div class="label" id="t">10.0s</div>
     </div>
 
-    <div class="big" style="margin-top:12px" id="qText">-</div>
+    <div class="qtext" id="qText">-</div>
 
-    <div class="answers" style="margin-top:12px">
-      <button class="ans" id="c0">-</button>
-      <button class="ans" id="c1">-</button>
-      <button class="ans" id="c2">-</button>
-      <button class="ans" id="c3">-</button>
+    <div class="answers">
+      <button class="choice choiceBtn" id="c0"><div class="badge cA">A</div><div id="ct0">-</div></button>
+      <button class="choice choiceBtn" id="c1"><div class="badge cB">B</div><div id="ct1">-</div></button>
+      <button class="choice choiceBtn" id="c2"><div class="badge cC">C</div><div id="ct2">-</div></button>
+      <button class="choice choiceBtn" id="c3"><div class="badge cD">D</div><div id="ct3">-</div></button>
     </div>
 
     <div class="small" id="msg" style="margin-top:10px"></div>
@@ -41,28 +43,27 @@
 
   <div class="card" id="waitCard" style="display:none;">
     <div class="big">Beklemede…</div>
-    <hr/>
-<div class="big">Top 4</div>
-<div id="top" style="margin-top:10px"></div>
-
-    <div class="small">Host başlatınca soru gelir / Leaderboard arasında bekler.</div>
+    <div class="small" id="waitMsg">Host sonraki adıma geçince güncellenecek.</div>
+    <div class="hr"></div>
+    <div class="big">Top 4</div>
+    <div id="top"></div>
   </div>
+
 </div>
 
 <script>
-  // ✅ BURAYI DOĞRU WORKER URL İLE AYARLA
   const API_BASE = "https://asn-quiz.abdulkadir-sezginn.workers.dev";
-let answeredThisQuestion = false;
-
   const $ = id => document.getElementById(id);
+
   const u = new URL(location.href);
   const gameId = (u.searchParams.get("game") || "").toUpperCase();
-
   $("gidLbl").textContent = "Oyun: " + (gameId || "-");
 
   let playerId = localStorage.getItem("p_id_"+gameId) || "";
   let playerToken = localStorage.getItem("p_tok_"+gameId) || "";
   let lastAnsweredQ = Number(localStorage.getItem("p_lastq_"+gameId) || "-1");
+  let answeredThisQuestion = false;
+  let currentQIndex = -1;
 
   async function api(path, method="GET", body=null){
     const r = await fetch(API_BASE + path, {
@@ -82,7 +83,7 @@ let answeredThisQuestion = false;
 
   $("btnJoin").onclick = async ()=>{
     const name = $("name").value.trim();
-    if(!gameId) return alert("Link hatalı. ?game=XXXX parametresi yok.");
+    if(!gameId) return alert("Link hatalı. ?game=XXXX yok.");
     if(!name) return alert("İsim gir");
     const res = await api(`/api/game/${gameId}/join`, "POST", { name });
     playerId = res.playerId;
@@ -93,80 +94,82 @@ let answeredThisQuestion = false;
   };
 
   async function send(choice){
-  // anında kilitle (PC’de çift tıklama / tekrar gönderme engeli)
-  answeredThisQuestion = true;
-  ["c0","c1","c2","c3"].forEach(id => $(id).disabled = true);
+    answeredThisQuestion = true;
+    ["c0","c1","c2","c3"].forEach(id => $(id).disabled = true);
 
-  $("msg").textContent = "Gönderiliyor…";
-  try{
-    await api(`/api/game/${gameId}/answer`, "POST", { playerId, playerToken, choice });
-    $("msg").textContent = "Gönderildi ✅";
-
-    // ✅ EN KRİTİK: currentQIndex doğruyken yaz
-    lastAnsweredQ = currentQIndex;
-    localStorage.setItem("p_lastq_"+gameId, String(lastAnsweredQ));
-  }catch(e){
-    $("msg").textContent = "Alınmadı (süre bitmiş olabilir).";
-    // hata olsa bile bu soruda tekrar denemesin istersen true kalsın
+    $("msg").textContent = "Gönderiliyor…";
+    try{
+      await api(`/api/game/${gameId}/answer`, "POST", { playerId, playerToken, choice });
+      $("msg").textContent = "Gönderildi ✅";
+      lastAnsweredQ = currentQIndex;
+      localStorage.setItem("p_lastq_"+gameId, String(lastAnsweredQ));
+    }catch(e){
+      $("msg").textContent = "Alınmadı (süre bitmiş olabilir).";
+    }
   }
-}
-
 
   ["c0","c1","c2","c3"].forEach((id,i)=> $(id).onclick = ()=>send(i));
-
-  let currentQIndex = -1;
 
   async function poll(){
     if(!gameId){ show("join"); return; }
     if(!playerId){ show("join"); return; }
 
     const st = await api(`/api/game/${gameId}/state`);
-const top = st.top4 || [];
-const topEl = document.getElementById("top");
-if (topEl) {
-  topEl.innerHTML = top.length
-    ? top.map((p,i)=>`<div class="row"><div>${i+1}. ${p.name}</div><div class="kv">${p.score}</div></div>`).join("")
-    : "<div class='small'>-</div>";
-}
 
-    // Score'u host state içinden direkt veremiyoruz (bilerek).
-    // Basit olsun diye burada göstermiyoruz; istersen API'ye oyuncu skor endpointi ekleriz.
-    $("score").textContent = "—";
+    // top4 her durumda gösterilsin
+    const top = st.top4 || [];
+    $("top").innerHTML = top.length
+      ? top.map((p,i)=>`<div class="tableRow"><div class="rank">${i+1}. ${p.name}</div><div class="kv">${p.score}</div></div>`).join("")
+      : "<div class='small'>-</div>";
 
-    if(st.phase === "lobby"){ show("wait"); return; }
+    if(st.phase === "lobby"){
+      show("wait");
+      $("waitMsg").textContent = "Host başlatınca soru gelir.";
+      return;
+    }
+
+    if(st.phase === "leaderboard"){
+      show("wait");
+      $("waitMsg").textContent = "Skorlar güncellendi. Host Next ile devam edecek.";
+      return;
+    }
+
+    if(st.phase === "finished"){
+      show("wait");
+      $("waitMsg").textContent = "Quiz bitti 🎉";
+      return;
+    }
 
     if(st.phase === "question"){
       show("q");
 
+      currentQIndex = st.qIndex ?? -1;
 
-     currentQIndex = st.qIndex ?? -1;
+      // yeni soru geldiyse kilidi kaldır
+      if(lastAnsweredQ !== currentQIndex){
+        answeredThisQuestion = false;
+      }
 
-// yeni soru gelince kilidi kaldır
-if (lastAnsweredQ !== currentQIndex) {
-  answeredThisQuestion = false;
-  ["c0","c1","c2","c3"].forEach(id => $(id).disabled = false);
-}
       $("qIndex").textContent = `Soru ${currentQIndex + 1}/${st.qTotal ?? 0}`;
       $("qText").textContent = st.q?.text || "-";
-      (st.q?.choices || ["-","-","-","-"]).forEach((x,i)=> $("c"+i).textContent = x);
+      (st.q?.choices || ["-","-","-","-"]).forEach((x,i)=> $("ct"+i).textContent = x);
 
-     const endsAt = (typeof st.endsAt === "number" ? st.endsAt : Date.now() + 10000);
+      const endsAt = (typeof st.endsAt === "number") ? st.endsAt : (Date.now()+10000);
       const left = Math.max(0, endsAt - Date.now());
-      $("t").textContent = (left/1000).toFixed(1)+"s";
-      $("fill").style.width = (left/10000*100).toFixed(0)+"%";
-const answered = answeredThisQuestion || (lastAnsweredQ === currentQIndex);
-["c0","c1","c2","c3"].forEach(id => $(id).disabled = answered);
+      $("t").textContent = (left/1000).toFixed(1);
+      $("fill").style.width = (left/10000*100).toFixed(0) + "%";
 
-      if(!answeredThis) $("msg").textContent = "";
+      const answered = answeredThisQuestion || (lastAnsweredQ === currentQIndex);
+      ["c0","c1","c2","c3"].forEach(id => $(id).disabled = answered);
+
+      if(!answered) $("msg").textContent = "";
       return;
     }
 
-    // leaderboard/finished vs
     show("wait");
   }
 
-  setInterval(()=>poll().catch(()=>{}), 300);
+  setInterval(()=>poll().catch(()=>{}), 200);
 </script>
 </body>
 </html>
-
