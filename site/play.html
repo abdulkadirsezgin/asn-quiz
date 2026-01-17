@@ -52,6 +52,7 @@
 <script>
   // ✅ BURAYI DOĞRU WORKER URL İLE AYARLA
   const API_BASE = "https://asn-quiz.abdulkadir-sezginn.workers.dev";
+let answeredThisQuestion = false;
 
   const $ = id => document.getElementById(id);
   const u = new URL(location.href);
@@ -130,7 +131,14 @@ if (topEl) {
     if(st.phase === "question"){
       show("q");
 
-      currentQIndex = st.qIndex ?? -1;
+
+     currentQIndex = st.qIndex ?? -1;
+
+// yeni soru gelince kilidi kaldır
+if (lastAnsweredQ !== currentQIndex) {
+  answeredThisQuestion = false;
+  ["c0","c1","c2","c3"].forEach(id => $(id).disabled = false);
+}
       $("qIndex").textContent = `Soru ${currentQIndex + 1}/${st.qTotal ?? 0}`;
       $("qText").textContent = st.q?.text || "-";
       (st.q?.choices || ["-","-","-","-"]).forEach((x,i)=> $("c"+i).textContent = x);
@@ -139,9 +147,9 @@ if (topEl) {
       const left = Math.max(0, endsAt - Date.now());
       $("t").textContent = (left/1000).toFixed(1)+"s";
       $("fill").style.width = (left/10000*100).toFixed(0)+"%";
+const answered = answeredThisQuestion || (lastAnsweredQ === currentQIndex);
+["c0","c1","c2","c3"].forEach(id => $(id).disabled = answered);
 
-      const answeredThis = (lastAnsweredQ === currentQIndex);
-      ["c0","c1","c2","c3"].forEach(id => $(id).disabled = answeredThis);
       if(!answeredThis) $("msg").textContent = "";
       return;
     }
