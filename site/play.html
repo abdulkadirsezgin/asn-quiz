@@ -113,6 +113,13 @@
     if(!playerId){ show("join"); return; }
 
     const st = await api(`/api/game/${gameId}/state`);
+const top = st.top4 || [];
+const topEl = document.getElementById("top");
+if (topEl) {
+  topEl.innerHTML = top.length
+    ? top.map((p,i)=>`<div class="row"><div>${i+1}. ${p.name}</div><div class="kv">${p.score}</div></div>`).join("")
+    : "<div class='small'>-</div>";
+}
 
     // Score'u host state içinden direkt veremiyoruz (bilerek).
     // Basit olsun diye burada göstermiyoruz; istersen API'ye oyuncu skor endpointi ekleriz.
