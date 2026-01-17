@@ -5,138 +5,141 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>ASN Quiz Host</title>
   <link rel="stylesheet" href="./style.css"/>
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 <div class="wrap">
+
   <div class="card">
     <div class="row">
-      <div class="big">ASN Quiz (Host)</div>
-      <div class="small kv" id="apiLbl"></div>
+      <div>
+        <div class="big">ASN Quiz • Host</div>
+        <div class="small kv" id="apiLbl"></div>
+      </div>
+      <div class="btns">
+        <button class="primary" id="btnCreate">Create</button>
+        <button id="btnStart">Start</button>
+        <button id="btnNext">Next</button>
+        <button id="btnClear">Clear</button>
+      </div>
     </div>
 
-    <div class="row" style="margin-top:12px;">
-      <button class="primary" id="btnCreate">Create Game</button>
-      <button id="btnStart">Start</button>
-      <button id="btnNext">Next</button>
-      <button id="btnClear">Clear Local</button>
-    </div>
-
-    <hr/>
+    <div class="hr"></div>
 
     <div class="row">
-      <div class="small">GameId: <b class="kv" id="gameId">-</b></div>
-      <div class="small">Katılan: <b id="pc">0</b></div>
-      <div class="small">Phase: <b class="kv" id="phase">-</b></div>
+      <div class="pill">GameId: <b class="kv" id="gameId">-</b></div>
+      <div class="pill">Katılan: <b id="pc">0</b></div>
+      <div class="pill">Phase: <b class="kv" id="phase">-</b></div>
+      <div class="pill">Soru: <b id="qPos">-</b>/<b id="qTotal">-</b></div>
     </div>
 
-    <div style="margin-top:10px" class="small">
+    <div style="margin-top:12px" class="small">
       Join link:
-      <div id="qr" style="margin-top:10px;"></div>
       <div class="kv" id="joinLink" style="margin-top:6px; word-break: break-all;">-</div>
-    </div>
-    <div class="small" style="margin-top:10px;">
-  Durum: <span class="kv" id="err">-</span>
-</div>
-
-  </div>
-
-  <div class="card">
-    <div class="row">
-      <div class="big" id="qIndex">Soru</div>
-      <div class="small">Toplam: <b id="qTotal">-</b></div>
-    </div>
-
-    <div style="margin-top:10px" class="progress">
-      <div class="fill" id="fill"></div>
-      <div class="label" id="t">10.0s</div>
-    </div>
-
-    <div style="margin-top:14px" class="big" id="qText">-</div>
-
-    <div class="answers" style="margin-top:14px">
-      <div class="ans" id="a0">-</div>
-      <div class="ans" id="a1">-</div>
-      <div class="ans" id="a2">-</div>
-      <div class="ans" id="a3">-</div>
+      <div id="qr" style="margin-top:12px;"></div>
+      <div class="small" style="margin-top:10px;">Durum: <span class="kv" id="err">-</span></div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="big">Top 4</div>
-    <div id="top" style="margin-top:10px"></div>
+  <div class="grid">
+    <div class="card">
+      <div class="row">
+        <div class="pill huge" id="t">10.0</div>
+        <div class="pill small" id="phaseHint">-</div>
+      </div>
+
+      <div style="margin-top:12px" class="progress">
+        <div class="fill" id="fill"></div>
+      </div>
+
+      <div class="qtext" id="qText">-</div>
+
+      <div class="answers">
+        <div class="choice"><div class="badge cA">A</div><div id="a0">-</div></div>
+        <div class="choice"><div class="badge cB">B</div><div id="a1">-</div></div>
+        <div class="choice"><div class="badge cC">C</div><div id="a2">-</div></div>
+        <div class="choice"><div class="badge cD">D</div><div id="a3">-</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="big">Top 4</div>
+      <div id="top"></div>
+    </div>
   </div>
 </div>
 
 <script>
-  // ✅ BURAYI DOĞRU WORKER URL İLE AYARLA
   const API_BASE = "https://asn-quiz.abdulkadir-sezginn.workers.dev";
-
-  const $ = (id) => document.getElementById(id);
+  const $ = (id)=>document.getElementById(id);
   $("apiLbl").textContent = API_BASE;
 
   let gameId = localStorage.getItem("asn_gameId") || "";
   let hostToken = localStorage.getItem("asn_hostToken") || "";
+  let lastQRText = "";
 
-function joinUrl(gid){
-  return `https://asn-quiz.pages.dev/play.html?game=${encodeURIComponent(gid)}`;
-}
-  
+  function joinUrl(gid){
+    return `https://asn-quiz.pages.dev/play.html?game=${encodeURIComponent(gid)}`;
+  }
+
   async function api(path, method="GET", body=null, auth=false){
     const headers = {"Content-Type":"application/json"};
     if(auth && hostToken) headers["Authorization"] = "Bearer " + hostToken;
-
-    const r = await fetch(API_BASE + path, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : null
-    });
-
+    const r = await fetch(API_BASE + path, { method, headers, body: body?JSON.stringify(body):null });
     if(!r.ok) throw new Error(await r.text());
     return r.json();
   }
 
-$("btnCreate").onclick = async ()=>{
-  $("err").textContent = "Create istek atılıyor...";
-  try {
-    const res = await api("/api/game/create","POST",{quizKey:"quiz:siber"});
-    gameId = res.gameId;
-    hostToken = res.hostToken;
-    localStorage.setItem("asn_gameId", gameId);
-    localStorage.setItem("asn_hostToken", hostToken);
-    $("err").textContent = "OK ✅ GameID: " + gameId;
-    alert("Game created: " + gameId);
-  } catch (e) {
-    $("err").textContent = "HATA ❌ " + (e?.message || e);
-    console.error(e);
-    alert("Create Game hata: " + (e?.message || e));
-  }
-};
-
+  $("btnCreate").onclick = async ()=>{
+    $("err").textContent = "Create istek atılıyor...";
+    try{
+      const res = await api("/api/game/create","POST",{quizKey:"quiz:siber"});
+      gameId = res.gameId;
+      hostToken = res.hostToken;
+      localStorage.setItem("asn_gameId", gameId);
+      localStorage.setItem("asn_hostToken", hostToken);
+      $("err").textContent = "OK ✅ GameID: " + gameId;
+    }catch(e){
+      $("err").textContent = "HATA ❌ " + (e?.message || e);
+      console.error(e);
+      alert("Create Game hata: " + (e?.message || e));
+    }
+  };
 
   $("btnStart").onclick = async ()=>{
-    if(!gameId) return alert("Önce Create Game");
-    await api(`/api/game/${gameId}/start`,"POST",{},true);
+    if(!gameId) return alert("Önce Create");
+    try{ await api(`/api/game/${gameId}/start`,"POST",{},true); }
+    catch(e){ alert("Start hata: " + (e?.message||e)); }
   };
 
   $("btnNext").onclick = async ()=>{
-    if(!gameId) return alert("Önce Create Game");
-    await api(`/api/game/${gameId}/next`,"POST",{},true);
+    if(!gameId) return alert("Önce Create");
+    try{ await api(`/api/game/${gameId}/next`,"POST",{},true); }
+    catch(e){ alert("Next hata: " + (e?.message||e)); }
   };
 
   $("btnClear").onclick = ()=>{
     localStorage.removeItem("asn_gameId");
     localStorage.removeItem("asn_hostToken");
-    gameId = "";
-    hostToken = "";
-    alert("Local temizlendi");
+    gameId = ""; hostToken="";
+    $("err").textContent = "Local temizlendi";
   };
+
+  function renderQR(text){
+    if(!text) return;
+    if(text === lastQRText) return;
+    lastQRText = text;
+    const qrEl = $("qr");
+    qrEl.innerHTML = "";
+    new QRCode(qrEl, { text, width: 220, height: 220 });
+  }
 
   async function poll(){
     if(!gameId){
       $("gameId").textContent = "-";
       $("joinLink").textContent = "-";
       $("phase").textContent = "-";
+      $("qText").textContent = "-";
       return;
     }
 
@@ -144,36 +147,29 @@ $("btnCreate").onclick = async ()=>{
     $("gameId").textContent = gameId;
     $("pc").textContent = st.playerCount || 0;
     $("phase").textContent = st.phase || "-";
-    const link = joinUrl(gameId);
-$("joinLink").textContent = link;
-
-// QR
-const qrEl = document.getElementById("qr");
-qrEl.innerHTML = "";
-new QRCode(qrEl, { text: link, width: 200, height: 200 });
-
     $("qTotal").textContent = st.qTotal ?? "-";
-    $("qIndex").textContent = `Soru ${(st.qIndex ?? -1) + 1}`;
-    $("qText").textContent = st.q?.text || "-";
+    $("qPos").textContent = (st.qIndex ?? -1) + 1;
+    $("phaseHint").textContent = st.phase || "-";
 
-    const choices = st.q?.choices || ["-","-","-","-"];
-    choices.forEach((x,i)=> $("a"+i).textContent = x);
+    const link = joinUrl(gameId);
+    $("joinLink").textContent = link;
+    renderQR(link);
 
-    // timer bar
-    const endsAt = st.endsAt || (Date.now()+10000);
+    $("qText").textContent = st.q?.text || (st.phase==="leaderboard" ? "Leaderboard" : "-");
+    (st.q?.choices || ["-","-","-","-"]).forEach((x,i)=> $("a"+i).textContent = x);
+
+    const endsAt = (typeof st.endsAt === "number") ? st.endsAt : (Date.now()+10000);
     const left = Math.max(0, endsAt - Date.now());
-    $("t").textContent = (left/1000).toFixed(1) + "s";
+    $("t").textContent = (left/1000).toFixed(1);
     $("fill").style.width = (left/10000*100).toFixed(0) + "%";
 
-    // top4
     const top = st.top4 || [];
     $("top").innerHTML = top.length
-      ? top.map((p,i)=>`<div class="row"><div>${i+1}. ${p.name}</div><div class="kv">${p.score}</div></div>`).join("")
+      ? top.map((p,i)=>`<div class="tableRow"><div class="rank">${i+1}. ${p.name}</div><div class="kv">${p.score}</div></div>`).join("")
       : "<div class='small'>-</div>";
   }
 
-  setInterval(()=>poll().catch(()=>{}), 300);
+  setInterval(()=>poll().catch(()=>{}), 250);
 </script>
 </body>
 </html>
-
