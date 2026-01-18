@@ -1,9 +1,12 @@
+const QUESTION_MS = 20_000;
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
 
+    // CORS: gelen origin'i yansıt (Pages/GitHub vb. fark etmesin)
     const origin = req.headers.get("Origin") || "";
-    const allowOrigin = origin === env.APP_ORIGIN ? origin : env.APP_ORIGIN;
+    const allowOrigin = origin || env.APP_ORIGIN || "*";
 
     if (req.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(allowOrigin) });
@@ -56,7 +59,7 @@ export default {
 
 function corsHeaders(origin) {
   return {
-    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Origin": origin || "*",
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };
@@ -89,7 +92,7 @@ export class GameRoom {
       await this.state.storage.put("qIndex", -1);
       await this.state.storage.put("qTotal", null);
 
-      await this.state.storage.put("players", {}); // {playerId:{name,score,token}}
+      await this.state.storage.put("players", {}); // {playerId:{name,scoreMs,correct,token}}
       await this.state.storage.put("answers", {}); // {playerId:{choice,t}}
 
       return new Response("ok");
@@ -101,7 +104,13 @@ export class GameRoom {
       const playerId = crypto.randomUUID().slice(0, 6).toUpperCase();
       const playerToken = crypto.randomUUID();
 
-      players[playerId] = { name: String(name || "Anon"), score: 0, token: playerToken };
+      // scoreMs: toplam süre (ms) - küçük iyi, correct: doğru sayısı
+      players[playerId] = {
+        name: String(name || "Anon"),
+        scoreMs: 0,
+        correct: 0,
+        token: playerToken,
+      };
       await this.state.storage.put("players", players);
 
       return this.ok({ playerId, playerToken });
@@ -115,9 +124,15 @@ export class GameRoom {
       const qPublic = (await this.state.storage.get("qPublic")) || null;
       const players = (await this.state.storage.get("players")) || {};
 
+      // önce correct desc, eşitse scoreMs asc
       const top4 = Object.entries(players)
-        .map(([id, p]) => ({ id, name: p.name, score: p.score }))
-        .sort((a, b) => b.score - a.score)
+        .map(([id, p]) => ({
+          id,
+          name: p.name,
+          correct: p.correct ?? 0,
+          scoreMs: p.scoreMs ?? 0,
+        }))
+        .sort((a, b) => (b.correct - a.correct) || (a.scoreMs - b.scoreMs))
         .slice(0, 4);
 
       return this.ok({
@@ -201,6 +216,7 @@ export class GameRoom {
       await this.state.storage.put("phase", "finished");
       await this.state.storage.delete("qPublic");
       await this.state.storage.delete("qCorrect");
+      await this.state.storage.delete("endsAt");
       return;
     }
 
@@ -212,7 +228,7 @@ export class GameRoom {
     await this.state.storage.put("answers", {});
     await this.state.storage.put("phase", "question");
 
-    const endsAt = Date.now() + 10_000;
+    const endsAt = Date.now() + QUESTION_MS;
     await this.state.storage.put("endsAt", endsAt);
     await this.state.storage.setAlarm(endsAt);
   }
@@ -226,20 +242,32 @@ export class GameRoom {
     const answers = (await this.state.storage.get("answers")) || {};
     const players = (await this.state.storage.get("players")) || {};
 
-    const totalMs = 10_000;
-    for (const [playerId, ans] of Object.entries(answers)) {
-      const p = players[playerId];
-      if (!p) continue;
-      if (ans.choice === correct) {
-        const t = Math.min(ans.t, endsAt);
-        const remaining = Math.max(0, endsAt - t);
-        const speedBonus = Math.round((remaining / totalMs) * 500);
-        p.score += 1000 + speedBonus;
+    const qStart = (endsAt ?? Date.now()) - QUESTION_MS;
+
+    // Her oyuncu için: doğruysa elapsed ekle, yanlış/cevapsızsa QUESTION_MS ceza
+    for (const [playerId, p] of Object.entries(players)) {
+      if (typeof p.scoreMs !== "number") p.scoreMs = 0;
+      if (typeof p.correct !== "number") p.correct = 0;
+
+      const ans = answers[playerId];
+
+      if (!ans) {
+        p.scoreMs += QUESTION_MS;
+        continue;
       }
+
+      if (ans.choice !== correct) {
+        p.scoreMs += QUESTION_MS;
+        continue;
+      }
+
+      const t = Math.min(ans.t, endsAt);
+      const elapsed = Math.max(0, Math.min(QUESTION_MS, t - qStart));
+      p.scoreMs += elapsed;
+      p.correct += 1;
     }
 
     await this.state.storage.put("players", players);
     await this.state.storage.put("phase", "leaderboard");
   }
 }
-
