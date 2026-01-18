@@ -149,6 +149,45 @@ const QUESTION_MS = 20000;
     qrEl.innerHTML = "";
     new QRCode(qrEl, { text, width: 220, height: 220 });
   }
+  function showWinnerOverlay(w){
+  const ov = $("winnerOv");
+  $("winnerName").textContent = w?.name || "-";
+  const c = w?.correct ?? 0;
+  const t = ((w?.scoreMs ?? 0)/1000).toFixed(1) + "s";
+  $("winnerMeta").textContent = `${c}✓ • ${t}`;
+
+  ov.style.display = "flex";
+  spawnConfetti(90);
+}
+
+function hideWinnerOverlay(){
+  $("winnerOv").style.display = "none";
+  $("confetti").innerHTML = "";
+}
+
+$("winnerClose").onclick = hideWinnerOverlay;
+
+function spawnConfetti(n=80){
+  const box = $("confetti");
+  box.innerHTML = "";
+  const W = window.innerWidth;
+  for(let i=0;i<n;i++){
+    const el = document.createElement("i");
+    const left = Math.random()*W;
+    const dur = 2.2 + Math.random()*2.0;
+    const delay = Math.random()*0.6;
+    const size = 8 + Math.random()*10;
+    el.style.left = left + "px";
+    el.style.width = (size*0.6) + "px";
+    el.style.height = size + "px";
+    el.style.animationDuration = dur + "s";
+    el.style.animationDelay = delay + "s";
+    // Renk vermiyoruz (istemeden renk zorunlu); mevcut temaya uyum için beyaz tonlar
+    el.style.background = "rgba(255,255,255," + (0.5 + Math.random()*0.5) + ")";
+    box.appendChild(el);
+  }
+}
+
 
   async function poll(){
     if(!gameId){
