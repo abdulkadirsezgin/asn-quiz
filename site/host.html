@@ -73,6 +73,7 @@
   const API_BASE = "https://asn-quiz.abdulkadir-sezginn.workers.dev";
   const $ = (id)=>document.getElementById(id);
   $("apiLbl").textContent = API_BASE;
+const QUESTION_MS = 20000;
 
   let gameId = localStorage.getItem("asn_gameId") || "";
   let hostToken = localStorage.getItem("asn_hostToken") || "";
@@ -161,7 +162,8 @@
     const endsAt = (typeof st.endsAt === "number") ? st.endsAt : (Date.now()+10000);
     const left = Math.max(0, endsAt - Date.now());
     $("t").textContent = (left/1000).toFixed(1);
-    $("fill").style.width = (left/10000*100).toFixed(0) + "%";
+ $("fill").style.width = (left/QUESTION_MS*100).toFixed(0) + "%";
+
 
     const top = st.top4 || [];
     $("top").innerHTML = top.length
