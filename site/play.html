@@ -21,7 +21,7 @@
 
   <div class="card" id="qCard" style="display:none;">
     <div class="row">
-      <div class="pill huge" id="t">10.0</div>
+      <div class="pill huge" id="t">20.0</div>
       <div class="pill small" id="qIndex">Soru</div>
     </div>
 
@@ -150,7 +150,8 @@ function stopSmoothTimer() {
     const st = await api(`/api/game/${gameId}/state`);
 
     // top4 her durumda gösterilsin
-   const top = st.top4 || [];
+const topEl = $("top");
+const top = st.top4 || [];
 topEl.innerHTML = top.length
   ? top.map((p,i)=>{
       const t = ((p.scoreMs || 0) / 1000).toFixed(1) + "s";
@@ -162,6 +163,7 @@ topEl.innerHTML = top.length
         </div>`;
     }).join("")
   : "<div class='small'>-</div>";
+
 
     if(st.phase === "lobby"){
         stopSmoothTimer();
