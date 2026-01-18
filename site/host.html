@@ -44,7 +44,8 @@
   <div class="grid">
     <div class="card">
       <div class="row">
-        <div class="pill huge" id="t">10.0</div>
+ <div class="pill huge" id="t">20.0</div>
+
         <div class="pill small" id="phaseHint">-</div>
       </div>
 
@@ -159,16 +160,25 @@ const QUESTION_MS = 20000;
     $("qText").textContent = st.q?.text || (st.phase==="leaderboard" ? "Leaderboard" : "-");
     (st.q?.choices || ["-","-","-","-"]).forEach((x,i)=> $("a"+i).textContent = x);
 
-    const endsAt = (typeof st.endsAt === "number") ? st.endsAt : (Date.now()+10000);
+  const endsAt = (typeof st.endsAt === "number") ? st.endsAt : (Date.now() + QUESTION_MS);
+
     const left = Math.max(0, endsAt - Date.now());
     $("t").textContent = (left/1000).toFixed(1);
  $("fill").style.width = (left/QUESTION_MS*100).toFixed(0) + "%";
 
 
-    const top = st.top4 || [];
-    $("top").innerHTML = top.length
-      ? top.map((p,i)=>`<div class="tableRow"><div class="rank">${i+1}. ${p.name}</div><div class="kv">${p.score}</div></div>`).join("")
-      : "<div class='small'>-</div>";
+  const top = st.top4 || [];
+$("top").innerHTML = top.length
+  ? top.map((p,i)=>{
+      const c = (p.correct ?? 0);
+      const t = (((p.scoreMs ?? 0) / 1000).toFixed(1)) + "s";
+      return `<div class="tableRow">
+        <div class="rank">${i+1}. ${p.name}</div>
+        <div class="kv">${c}✓ • ${t}</div>
+      </div>`;
+    }).join("")
+  : "<div class='small'>-</div>";
+
   }
 
   setInterval(()=>poll().catch(()=>{}), 250);
