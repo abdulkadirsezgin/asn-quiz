@@ -222,26 +222,39 @@ topEl.innerHTML = top.length
     if(st.phase === "lobby"){
         stopSmoothTimer();
       show("wait");
-      $("waitMsg").textContent = "Host başlatınca soru gelir.";
+      $("waitMsg").textContent = "Mr. Sezgin başlatınca soru gelir.";
+      winnerShown = false;
+hideWinnerOverlay();
+
       return;
     }
 
     if(st.phase === "leaderboard"){
         stopSmoothTimer();
       show("wait");
-      $("waitMsg").textContent = "Skorlar güncellendi. Host Next ile devam edecek.";
+      $("waitMsg").textContent = "Skorlar güncellendi. Mr. Sezgin kısa süre içerisinde devam edecek.";
       return;
     }
 
-    if(st.phase === "finished"){
-      stopSmoothTimer();
-      show("wait");
-      $("waitMsg").textContent = "Quiz bitti 🎉";
-      return;
-    }
+  if(st.phase === "finished"){
+  stopSmoothTimer();
+  show("wait");
+  $("waitMsg").textContent = "Quiz bitti 🎉";
+
+  // Winner sadece bir kez gösterilsin
+  if (!winnerShown && st.top4 && st.top4[0]) {
+    winnerShown = true;
+    showWinnerOverlay(st.top4[0]);
+  }
+  return;
+}
+
 
     if(st.phase === "question"){
       show("q");
+      winnerShown = false;
+hideWinnerOverlay();
+
 
       currentQIndex = st.qIndex ?? -1;
 
