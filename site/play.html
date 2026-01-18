@@ -54,6 +54,7 @@
 <script>
   const API_BASE = "https://asn-quiz.abdulkadir-sezginn.workers.dev";
   const $ = id => document.getElementById(id);
+const QUESTION_MS = 20000; // 20 saniye
 
   const u = new URL(location.href);
   const gameId = (u.searchParams.get("game") || "").toUpperCase();
@@ -65,7 +66,8 @@
   let answeredThisQuestion = false;
   let currentQIndex = -1;
   let serverEndsAt = null;     // st.endsAt
-let lastLeftMs = 10_000;     // animasyonda göstereceğimiz kalan süre
+let lastLeftMs = QUESTION_MS;
+
 let rafId = null;
 
 
@@ -97,7 +99,8 @@ function startSmoothTimer() {
 
     // UI güncelle
     $("t").textContent = (lastLeftMs / 1000).toFixed(1);
-    $("fill").style.width = (left/QUESTION_MS*100).toFixed(0) + "%";
+   $("fill").style.width = (lastLeftMs / QUESTION_MS * 100).toFixed(0) + "%";
+
 
 
     rafId = requestAnimationFrame(tick);
@@ -147,10 +150,18 @@ function stopSmoothTimer() {
     const st = await api(`/api/game/${gameId}/state`);
 
     // top4 her durumda gösterilsin
-    const top = st.top4 || [];
-    $("top").innerHTML = top.length
-      ? top.map((p,i)=>`<div class="tableRow"><div class="rank">${i+1}. ${p.name}</div><div class="kv">${p.score}</div></div>`).join("")
-      : "<div class='small'>-</div>";
+   const top = st.top4 || [];
+topEl.innerHTML = top.length
+  ? top.map((p,i)=>{
+      const t = ((p.scoreMs || 0) / 1000).toFixed(1) + "s";
+      const c = (p.correct ?? 0);
+      return `
+        <div class="tableRow">
+          <div class="rank">${i+1}. ${p.name}</div>
+          <div class="kv">${c}✓ • ${t}</div>
+        </div>`;
+    }).join("")
+  : "<div class='small'>-</div>";
 
     if(st.phase === "lobby"){
         stopSmoothTimer();
@@ -187,7 +198,7 @@ function stopSmoothTimer() {
       $("qText").textContent = st.q?.text || "-";
       (st.q?.choices || ["-","-","-","-"]).forEach((x,i)=> $("ct"+i).textContent = x);
 
-      const endsAt = (typeof st.endsAt === "number") ? st.endsAt : (Date.now() + 10_000);
+      const endsAt = (typeof st.endsAt === "number") ? st.endsAt : (Date.now() + QUESTION_MS);
 
 // serverEndsAt değiştiyse ya da ilk kez geldiyse, animasyonu server’a hizala
 if (serverEndsAt !== endsAt) {
