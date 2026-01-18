@@ -119,3 +119,80 @@ button:disabled{opacity:.45; cursor:not-allowed; transform:none}
   margin-top:10px;
 }
 .rank{font-weight:950}
+.winnerOverlay{
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0,0,0,.85);
+  z-index: 9999;
+}
+
+.winnerCard{
+  width: min(720px, 92vw);
+  border-radius: 18px;
+  padding: 22px 18px;
+  background: rgba(18,18,22,.92);
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow: 0 20px 80px rgba(0,0,0,.55);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.winnerTitle{
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: .2px;
+}
+
+.winnerName{
+  margin-top: 10px;
+  font-size: 40px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.winnerSub{
+  margin-top: 10px;
+  opacity: .9;
+}
+
+.glow{
+  position:absolute;
+  inset:-40%;
+  background: radial-gradient(circle at 50% 30%, rgba(255,255,255,.18), transparent 55%);
+  animation: glowMove 2.8s ease-in-out infinite;
+  pointer-events:none;
+}
+
+@keyframes glowMove{
+  0%{ transform: translateY(-10px) scale(1.0); opacity:.7; }
+  50%{ transform: translateY(10px) scale(1.05); opacity:1; }
+  100%{ transform: translateY(-10px) scale(1.0); opacity:.7; }
+}
+
+/* Confetti */
+.confetti{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  overflow:hidden;
+}
+
+.confetti i{
+  position:absolute;
+  top:-12px;
+  width:10px;
+  height:16px;
+  opacity:.95;
+  border-radius: 3px;
+  animation: fall linear forwards;
+}
+
+@keyframes fall{
+  to { transform: translateY(110vh) rotate(720deg); }
+}
+
