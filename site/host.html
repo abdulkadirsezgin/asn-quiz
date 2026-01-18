@@ -233,6 +233,10 @@ $("top").innerHTML = top.length
   : "<div class='small'>-</div>";
 
   }
+if(st.phase === "finished"){
+  const winner = (st.top4 && st.top4[0]) ? st.top4[0] : null;
+  if(winner) showWinnerOverlay(winner);
+}
 
   setInterval(()=>poll().catch(()=>{}), 250);
 </script>
