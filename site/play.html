@@ -97,7 +97,8 @@ function startSmoothTimer() {
 
     // UI güncelle
     $("t").textContent = (lastLeftMs / 1000).toFixed(1);
-    $("fill").style.width = (lastLeftMs / 10_000 * 100).toFixed(0) + "%";
+    $("fill").style.width = (left/QUESTION_MS*100).toFixed(0) + "%";
+
 
     rafId = requestAnimationFrame(tick);
   };
