@@ -4,6 +4,8 @@ compatibility_date = "2025-01-01"
 
 [vars]
 APP_ORIGIN = "https://asn-quiz.pages.dev"
+APP_ORIGIN_2 = "https://abdulkadirsezgin.github.io"
+
 
 
 [[kv_namespaces]]
