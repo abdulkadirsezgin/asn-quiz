@@ -69,7 +69,8 @@
     </div>
   </div>
 </div>
-<div class="winnerOverlay" id="winnerOv">
+<div class="winnerOverlay" id="winnerOv" style="display:none">
+
   <div class="winnerCard">
     <div class="glow"></div>
     <div class="confetti" id="confetti"></div>
@@ -93,6 +94,8 @@ const QUESTION_MS = 20000;
   let gameId = localStorage.getItem("asn_gameId") || "";
   let hostToken = localStorage.getItem("asn_hostToken") || "";
   let lastQRText = "";
+  let winnerShown = false;
+
 
   function joinUrl(gid){
     return `https://asn-quiz.pages.dev/play.html?game=${encodeURIComponent(gid)}`;
@@ -231,10 +234,12 @@ $("top").innerHTML = top.length
       </div>`;
     }).join("")
   : "<div class='small'>-</div>";
-if(st.phase === "finished"){
+if(st.phase === "finished" && !winnerShown){
+  winnerShown = true;
   const winner = (st.top4 && st.top4[0]) ? st.top4[0] : null;
   if(winner) showWinnerOverlay(winner);
 }
+
   }
 
 
