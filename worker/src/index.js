@@ -155,25 +155,28 @@ export class GameRoom {
       const players = (await this.state.storage.get("players")) || {};
 
       // Sıralama: correct desc, sonra scoreMs asc
-      const top4 = Object.entries(players)
-        .map(([id, p]) => ({
-          id,
-          name: p.name,
-          correct: p.correct ?? 0,
-          scoreMs: p.scoreMs ?? 0,
-        }))
-        .sort((a, b) => (b.correct - a.correct) || (a.scoreMs - b.scoreMs))
-        .slice(0, 4);
+ const ranked = Object.entries(players)
+  .map(([id, p]) => ({
+    id,
+    name: p.name,
+    correct: p.correct ?? 0,
+    scoreMs: p.scoreMs ?? 0,
+  }))
+  .sort((a, b) => (b.correct - a.correct) || (a.scoreMs - b.scoreMs));
 
-      return this.ok({
-        phase,
-        qIndex,
-        qTotal,
-        endsAt,
-        q: qPublic,
-        playerCount: Object.keys(players).length,
-        top4,
-      });
+return this.ok({
+  phase,
+  qIndex,
+  qTotal,
+  endsAt,
+  q: qPublic,
+  playerCount: Object.keys(players).length,
+
+  // 🔽 farklı ihtiyaçlar
+  top4: ranked.slice(0, 4),
+  top10: ranked.slice(0, 10),
+});
+
     }
 
     // ---------------- start ----------------
