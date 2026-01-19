@@ -59,7 +59,8 @@ const allowOrigin = allowed.has(origin) ? origin : env.APP_ORIGIN;
       return new Response(r.body, { status: r.status, headers });
     }
 
-    return new Response("Not found", { status: 404 });
+return new Response("Not found", { status: 404, headers: corsHeaders(allowOrigin) });
+
   },
 };
 
