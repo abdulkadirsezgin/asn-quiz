@@ -52,11 +52,26 @@ const allowOrigin = allowed.has(origin) ? origin : env.APP_ORIGIN;
         body: req.method === "GET" || req.method === "HEAD" ? undefined : await req.arrayBuffer(),
       });
 
-      const headers = new Headers(r.headers);
+      try {
+    const r = await stub.fetch(doUrl.toString(), {...});
+
+    const headers = new Headers(r.headers);
+    headers.set("Access-Control-Allow-Origin", allowOrigin);
+    headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    return new Response(r.body, { status: r.status, headers });
+
+  } catch (e) {
+    // DO throw Response(...) yaptıysa buraya düşer
+    if (e instanceof Response) {
+      const headers = new Headers(e.headers);
       headers.set("Access-Control-Allow-Origin", allowOrigin);
       headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
       headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-      return new Response(r.body, { status: r.status, headers });
+      return new Response(e.body, { status: e.status, headers });
+    }
+    return new Response("Internal Error", { status: 500, headers: corsHeaders(allowOrigin) });
+  }
     }
 
 return new Response("Not found", { status: 404, headers: corsHeaders(allowOrigin) });
