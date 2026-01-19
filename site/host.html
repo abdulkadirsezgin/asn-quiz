@@ -117,6 +117,8 @@ const QUESTION_MS = 20000;
       hostToken = res.hostToken;
       localStorage.setItem("asn_gameId", gameId);
       localStorage.setItem("asn_hostToken", hostToken);
+        winnerShown = false;
+    hideWinnerOverlay();
       $("err").textContent = "OK ✅ GameID: " + gameId;
     }catch(e){
       $("err").textContent = "HATA ❌ " + (e?.message || e);
@@ -141,6 +143,8 @@ const QUESTION_MS = 20000;
     localStorage.removeItem("asn_gameId");
     localStorage.removeItem("asn_hostToken");
     gameId = ""; hostToken="";
+      winnerShown = false;
+    hideWinnerOverlay();
     $("err").textContent = "Local temizlendi";
   };
 
