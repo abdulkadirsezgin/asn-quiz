@@ -4,29 +4,27 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
 
-    // CORS: gelen origin'i yansıt (Pages/GitHub vb. fark etmesin)
+    // --- CORS: allowlist (Pages + opsiyonel ikinci origin) ---
     const origin = req.headers.get("Origin") || "";
-  const allowed = new Set([
-  env.APP_ORIGIN,              // ör: https://asn-quiz.pages.dev
-  env.APP_ORIGIN_2 || ""       // opsiyonel ikinci origin
-]);
+    const allowed = new Set([env.APP_ORIGIN, env.APP_ORIGIN_2 || ""]);
+    const allowOrigin = allowed.has(origin) ? origin : env.APP_ORIGIN;
 
-const allowOrigin = allowed.has(origin) ? origin : env.APP_ORIGIN;
-
-
+    // Preflight
     if (req.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(allowOrigin) });
     }
 
-    // create game
+    // --- Create game ---
     if (url.pathname === "/api/game/create" && req.method === "POST") {
       const body = await req.json().catch(() => ({}));
       const quizKey = body.quizKey || "quiz:siber";
+
       const gameId = crypto.randomUUID().slice(0, 8).toUpperCase();
       const hostToken = crypto.randomUUID();
 
       const id = env.GAME.idFromName(gameId);
       const stub = env.GAME.get(id);
+
       await stub.fetch("https://do/init", {
         method: "POST",
         body: JSON.stringify({ gameId, hostToken, quizKey }),
@@ -35,55 +33,53 @@ const allowOrigin = allowed.has(origin) ? origin : env.APP_ORIGIN;
       return json({ gameId, hostToken }, allowOrigin);
     }
 
-    // proxy to DO
+    // --- Proxy to Durable Object ---
     const m = url.pathname.match(/^\/api\/game\/([A-Z0-9]{8})(\/.*)?$/);
     if (m) {
       const gameId = m[1];
       const rest = m[2] || "/";
+
       const id = env.GAME.idFromName(gameId);
       const stub = env.GAME.get(id);
 
       const doUrl = new URL("https://do" + rest);
       doUrl.search = url.search;
 
-      const r = await stub.fetch(doUrl.toString(), {
-        method: req.method,
-        headers: req.headers,
-        body: req.method === "GET" || req.method === "HEAD" ? undefined : await req.arrayBuffer(),
-      });
-
       try {
-    const r = await stub.fetch(doUrl.toString(), {...});
+        const r = await stub.fetch(doUrl.toString(), {
+          method: req.method,
+          headers: req.headers,
+          body: req.method === "GET" || req.method === "HEAD" ? undefined : await req.arrayBuffer(),
+        });
 
-    const headers = new Headers(r.headers);
-    headers.set("Access-Control-Allow-Origin", allowOrigin);
-    headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    return new Response(r.body, { status: r.status, headers });
-
-  } catch (e) {
-    // DO throw Response(...) yaptıysa buraya düşer
-    if (e instanceof Response) {
-      const headers = new Headers(e.headers);
-      headers.set("Access-Control-Allow-Origin", allowOrigin);
-      headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-      headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-      return new Response(e.body, { status: e.status, headers });
-    }
-    return new Response("Internal Error", { status: 500, headers: corsHeaders(allowOrigin) });
-  }
+        return withCors(r, allowOrigin);
+      } catch (e) {
+        // DO tarafı throw Response(...) yaparsa buraya düşebilir.
+        if (e instanceof Response) return withCors(e, allowOrigin);
+        return new Response("Internal Error", { status: 500, headers: corsHeaders(allowOrigin) });
+      }
     }
 
-return new Response("Not found", { status: 404, headers: corsHeaders(allowOrigin) });
-
+    // Not found (CORS header'lı)
+    return new Response("Not found", { status: 404, headers: corsHeaders(allowOrigin) });
   },
 };
+
+function withCors(resp, origin) {
+  const headers = new Headers(resp.headers);
+  headers.set("Access-Control-Allow-Origin", origin || "*");
+  headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  headers.set("Vary", "Origin");
+  return new Response(resp.body, { status: resp.status, headers });
+}
 
 function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": origin || "*",
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Vary": "Origin",
   };
 }
 
@@ -93,6 +89,10 @@ function json(obj, origin, status = 200) {
     headers: { "Content-Type": "application/json", ...corsHeaders(origin) },
   });
 }
+
+// ===================================================================
+// Durable Object: GameRoom
+// ===================================================================
 
 export class GameRoom {
   constructor(state, env) {
@@ -104,8 +104,10 @@ export class GameRoom {
     const url = new URL(req.url);
     const path = url.pathname;
 
+    // ---------------- init ----------------
     if (path === "/init" && req.method === "POST") {
       const { gameId, hostToken, quizKey } = await req.json();
+
       await this.state.storage.put("gameId", gameId);
       await this.state.storage.put("hostToken", hostToken);
       await this.state.storage.put("quizKey", quizKey);
@@ -116,37 +118,43 @@ export class GameRoom {
 
       await this.state.storage.put("players", {}); // {playerId:{name,scoreMs,correct,token}}
       await this.state.storage.put("answers", {}); // {playerId:{choice,t}}
+      await this.state.storage.delete("endsAt");
+      await this.state.storage.delete("qPublic");
+      await this.state.storage.delete("qCorrect");
 
       return new Response("ok");
     }
 
+    // ---------------- join ----------------
     if (path === "/join" && req.method === "POST") {
       const { name } = await req.json();
+
       const players = (await this.state.storage.get("players")) || {};
       const playerId = crypto.randomUUID().slice(0, 6).toUpperCase();
       const playerToken = crypto.randomUUID();
 
-      // scoreMs: toplam süre (ms) - küçük iyi, correct: doğru sayısı
       players[playerId] = {
         name: String(name || "Anon"),
-        scoreMs: 0,
-        correct: 0,
+        scoreMs: 0,  // toplam süre: küçük daha iyi
+        correct: 0,  // doğru sayısı: büyük daha iyi
         token: playerToken,
       };
-      await this.state.storage.put("players", players);
 
+      await this.state.storage.put("players", players);
       return this.ok({ playerId, playerToken });
     }
 
+    // ---------------- state ----------------
     if (path === "/state" && req.method === "GET") {
       const phase = (await this.state.storage.get("phase")) || "lobby";
       const qIndex = (await this.state.storage.get("qIndex")) ?? -1;
       const qTotal = (await this.state.storage.get("qTotal")) ?? null;
-      const endsAt = (await this.state.storage.get("endsAt")) || null;
-      const qPublic = (await this.state.storage.get("qPublic")) || null;
+      const endsAt = (await this.state.storage.get("endsAt")) ?? null;
+      const qPublic = (await this.state.storage.get("qPublic")) ?? null;
+
       const players = (await this.state.storage.get("players")) || {};
 
-      // önce correct desc, eşitse scoreMs asc
+      // Sıralama: correct desc, sonra scoreMs asc
       const top4 = Object.entries(players)
         .map(([id, p]) => ({
           id,
@@ -168,22 +176,33 @@ export class GameRoom {
       });
     }
 
+    // ---------------- start ----------------
     if (path === "/start" && req.method === "POST") {
       await this.mustBeHost(req);
+
       await this.state.storage.put("phase", "lobby");
       await this.state.storage.put("qIndex", -1);
+
+      // İstersen burada skor resetleme yapabilirsin:
+      // const players = (await this.state.storage.get("players")) || {};
+      // for (const p of Object.values(players)) { p.scoreMs = 0; p.correct = 0; }
+      // await this.state.storage.put("players", players);
+
       await this.nextQuestion();
       return this.ok({ ok: true });
     }
 
+    // ---------------- next ----------------
     if (path === "/next" && req.method === "POST") {
       await this.mustBeHost(req);
       await this.nextQuestion();
       return this.ok({ ok: true });
     }
 
+    // ---------------- answer ----------------
     if (path === "/answer" && req.method === "POST") {
       const { playerId, playerToken, choice } = await req.json();
+
       const phase = await this.state.storage.get("phase");
       if (phase !== "question") return this.bad("Not accepting answers now");
 
@@ -220,20 +239,26 @@ export class GameRoom {
     const auth = req.headers.get("Authorization") || "";
     const token = auth.replace("Bearer ", "");
     const hostToken = await this.state.storage.get("hostToken");
-    if (!token || token !== hostToken) throw new Response("Unauthorized", { status: 401 });
+
+    if (!token || token !== hostToken) {
+      // throw yerine Response döndürmek daha stabil (proxy catch'e gerek kalmadan)
+      throw new Response("Unauthorized", { status: 401 });
+    }
   }
 
   async nextQuestion() {
     const quizKey = await this.state.storage.get("quizKey");
+
     const raw = await this.env.QUIZ_KV.get(quizKey);
     if (!raw) throw new Error("Quiz not found in KV: " + quizKey);
-    const quiz = JSON.parse(raw);
 
+    const quiz = JSON.parse(raw);
     await this.state.storage.put("qTotal", quiz.length);
 
     let qIndex = (await this.state.storage.get("qIndex")) ?? -1;
     qIndex += 1;
 
+    // Quiz bitti
     if (qIndex >= quiz.length) {
       await this.state.storage.put("phase", "finished");
       await this.state.storage.delete("qPublic");
@@ -266,24 +291,29 @@ export class GameRoom {
 
     const qStart = (endsAt ?? Date.now()) - QUESTION_MS;
 
-    // Her oyuncu için: doğruysa elapsed ekle, yanlış/cevapsızsa QUESTION_MS ceza
+    // Kural:
+    // - Doğru cevap: elapsed ekle (küçük daha iyi)
+    // - Yanlış veya boş: QUESTION_MS ceza ekle
     for (const [playerId, p] of Object.entries(players)) {
       if (typeof p.scoreMs !== "number") p.scoreMs = 0;
       if (typeof p.correct !== "number") p.correct = 0;
 
       const ans = answers[playerId];
 
+      // cevap yok -> ceza
       if (!ans) {
         p.scoreMs += QUESTION_MS;
         continue;
       }
 
+      // yanlış -> ceza
       if (ans.choice !== correct) {
         p.scoreMs += QUESTION_MS;
         continue;
       }
 
-      const t = Math.min(ans.t, endsAt);
+      // doğru -> süre ekle + correct++
+      const t = Math.min(ans.t, endsAt ?? ans.t);
       const elapsed = Math.max(0, Math.min(QUESTION_MS, t - qStart));
       p.scoreMs += elapsed;
       p.correct += 1;
