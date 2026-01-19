@@ -227,7 +227,7 @@ function spawnConfetti(n=80){
  $("fill").style.width = (left/QUESTION_MS*100).toFixed(0) + "%";
 
 
-  const top = st.top4 || [];
+  const top = st.top10 || [];
 $("top").innerHTML = top.length
   ? top.map((p,i)=>{
       const c = (p.correct ?? 0);
@@ -240,7 +240,7 @@ $("top").innerHTML = top.length
   : "<div class='small'>-</div>";
 if(st.phase === "finished" && !winnerShown){
   winnerShown = true;
-  const winner = (st.top4 && st.top4[0]) ? st.top4[0] : null;
+  const winner = (st.top10 && st.top10[0]) ? st.top10[0] : null;
   if(winner) showWinnerOverlay(winner);
 }
 
