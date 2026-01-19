@@ -6,7 +6,13 @@ export default {
 
     // CORS: gelen origin'i yansıt (Pages/GitHub vb. fark etmesin)
     const origin = req.headers.get("Origin") || "";
-    const allowOrigin = origin || env.APP_ORIGIN || "*";
+  const allowed = new Set([
+  env.APP_ORIGIN,              // ör: https://asn-quiz.pages.dev
+  env.APP_ORIGIN_2 || ""       // opsiyonel ikinci origin
+]);
+
+const allowOrigin = allowed.has(origin) ? origin : env.APP_ORIGIN;
+
 
     if (req.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(allowOrigin) });
